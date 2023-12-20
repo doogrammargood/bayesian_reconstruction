@@ -1,12 +1,13 @@
 from cvxopt import solvers, matrix, spdiag, log, mul,div
 import numpy as np
-from itertools import chain, combinations
+from itertools import chain, combinations, product
 import bayesian_reconstruction
 
 def observation_matrix(samples_list):
+    eps=0.0001
     #expects a list of pairs [(event , num_observations)]
-    total = sum([pair[1] for pair in samples_list])
-    return matrix([pair[1]/total for pair in samples_list] , (len(samples_list),1) )
+    total = sum([pair[1]+eps for pair in samples_list])
+    return matrix([(pair[1]+eps)/total for pair in samples_list] , (len(samples_list),1) )
 
 def generate_partial_measurements(lst, n):#https://stackoverflow.com/questions/5360220/how-to-split-a-list-into-pairs-in-all-possible-ways
     #Returns a list of lists of sets. Each inner list is a partition of lst, and each element of the partition is a set of size n.
@@ -190,11 +191,11 @@ def jigsaw_reconstruction(samples_list,N, alpha =0 ):
             return new_distribution
         current_distribution = new_distribution
 def jigsaw_example():
-    N=14
+    N=10
     dist = bayesian_reconstruction.ProbabilityDistribution(N, bayesian_reconstruction.uniform_sample_simplex(N))
     random_to_compare = bayesian_reconstruction.ProbabilityDistribution(N, bayesian_reconstruction.uniform_sample_simplex(N))
-    pmeas = simulate_partial_measurements(dist, generate_partial_measurements(range(N), 2), N,sample_size=100)
-    fmeas = simulate_partial_measurements(dist, generate_partial_measurements(range(N), 1), N)
+    pmeas = simulate_partial_measurements(dist, generate_partial_measurements(range(N), 2), N,sample_size=100000)
+    fmeas = simulate_partial_measurements(dist, generate_partial_measurements(range(N), 1), N, sample_size = 10000)
     #print(fmeas)
     totmeas = pmeas + fmeas
     def sort_function(s):
@@ -210,6 +211,48 @@ def jigsaw_example():
     print("corrected", total_variation_distance(dist.p_func, corrected_answer))
     print("random", total_variation_distance(dist.p_func,random_to_compare.p_func))
     return jigsaw_ans
-jigsaw_example()
-    #TODO: Complete jigsaw reconstruction
+#jigsaw_example()
+
+def bitlist_to_int(bitlist):
+    binary_str = ''.join(map(str, bitlist))
+    decimal_int = int(binary_str, 2)
+    return decimal_int
+
+def bitlist_index(bitlist, indices):
+    return [ b for i, b in enumerate(bitlist) if i in indices]
+
+def partition_from_qubits(qubits_to_be_measured,n):
+    #expect qubits_to_be_measured to be a list of qubits.
+    m=len(qubits_to_be_measured)
+    measured_bits= list(product([0,1], repeat = m))
+    total_bits = list(product([0,1], repeat=n))
+    to_return = [ { bitlist_to_int(tot) for tot in total_bits if bitlist_index(tot,qubits_to_be_measured)==list(out)} for out in measured_bits]
+    return to_return
+
+def p_meas_qubits(qubits_list,n):
+    return [partition_from_qubits(meas,n) for meas in qubits_list]
+#partition_from_qubits([2],3)
+def qubit_partial_measurement_example(n):
+    N= 2**n
+
+    dist = bayesian_reconstruction.ProbabilityDistribution(N, bayesian_reconstruction.uniform_sample_simplex(N))
+    qubit_list = list(combinations(range(n),2))
+    #print(qubit_list)
+    #print(p_meas_qubits(qubit_list,n))
+    #pmeas = simulate_partial_measurements(dist, generate_partial_measurements(range(N), 2), N,sample_size=1000)
+    fmeas = simulate_partial_measurements(dist, generate_partial_measurements(range(N), 1), N, sample_size = 10000)
+    pmeas = simulate_partial_measurements(dist, p_meas_qubits(qubit_list,n),N, sample_size = 10000 )
+    totmeas = pmeas + fmeas
+    def sort_function(s):
+        return set_of_outcomes_to_integer(s[0],N)
+    totmeas.sort(key = sort_function)
+    jigsaw_ans = jigsaw_reconstruction(totmeas,N,alpha=1)
+    jigsaw_modified_ans = jigsaw_reconstruction(totmeas,N)
+    basic_answer = optimal_distribution(fmeas)[0:N]
+    corrected_answer = optimal_distribution(totmeas)[0:N]
+    print("basic", total_variation_distance(dist.p_func, basic_answer))
+    print("jigsaw", total_variation_distance(dist.p_func, jigsaw_ans.p_func))
+    print("jigsaw modified", total_variation_distance(dist.p_func, jigsaw_modified_ans.p_func))
+    print("corrected", total_variation_distance(dist.p_func, corrected_answer))
+qubit_partial_measurement_example(8)
 #print(set_of_outcomes_to_integer({0},10), set_of_outcomes_to_integer({0,1},10))

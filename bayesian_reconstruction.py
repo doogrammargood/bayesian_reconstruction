@@ -48,13 +48,14 @@ class ProbabilityDistribution:
     def marginal(self,outcomes):
         #expects outcomes to be a list of elements [0,1...N-1]
         outcomes = list(outcomes)
+        new_N= len(outcomes)
         outcomes.sort()
         marginal_dist = [ self.p_func[o] for o in outcomes]
         denom = sum(marginal_dist)
         if np.isclose(denom, 0):
             return ProbabilityDistribution(new_N, p_func = [ 1/new_N ]*new_N)
         marginal_dist = [m/denom for m in marginal_dist]
-        new_N= len(outcomes)
+
         return ProbabilityDistribution(new_N, p_func = marginal_dist)
 
 class Event: #Describes a partial measurement of outcomes.
