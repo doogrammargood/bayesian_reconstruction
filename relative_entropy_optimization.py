@@ -190,6 +190,7 @@ def jigsaw_new_samples(current_distribution,pmeas,N,alpha):
             else:
                 new_distribution.append(({x},p[1]*marginal.p_func[index]/((1.0 - tot)**alpha) ) )
     new_distribution = remove_redundancies(new_distribution)
+    new_distribution.sort(key = lambda x: list(x[0])[0])
     new_distribution = [ pair[1] for pair in new_distribution]
     total = sum(new_distribution)
     new_distribution = [ n/total for n in new_distribution]

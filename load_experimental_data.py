@@ -132,63 +132,66 @@ def create_total_measurement_tuples(full_meas_option,p_meas_option):
 def build_table_max_likelihood_row(full_meas_option,p_meas_option):
     totmeas=create_total_measurement_tuples(full_meas_option,p_meas_option)
     ans = list(relative_entropy_optimization.optimal_distribution(totmeas)[0:N])
-    ans.sort()
+    #ans.sort()
     ideal = ideal_distribution()
     ideal.sort()
-    return relative_entropy_optimization.total_variation_distance(ans, ideal)
-    # ans = [(i,a) for i,a in enumerate(ans)]
-    # ans.sort(reverse=True, key= lambda x: x[1])
-    # assert {ans[0][0],ans[1][0]}=={bitstring_to_int("1"*13), bitstring_to_int("0"*13)}
-    # return 0.5*ans[0][1]+0.5*ans[1][1]
+    #return relative_entropy_optimization.total_variation_distance(ans, ideal)
+    ans = [(i,a) for i,a in enumerate(ans)]
+    ans.sort(reverse=True, key= lambda x: x[1])
+    assert {ans[0][0],ans[1][0]}=={bitstring_to_int("1"*13), bitstring_to_int("0"*13)}
+    return ans[0][1]+ans[1][1]
 
 def build_table_basic_row(full_meas_option,p_meas_option):
     fmeas = create_full_measurement_tuples(full_meas_option)
     print(sum([f[1] for f in fmeas if f[1]<0]))
     total = sum([f[1] for f in fmeas])
     #print(fmeas[0])
-    basic_dist = [f[1]/ total  for f in fmeas]
-    basic_dist.sort()
-    ideal = ideal_distribution()
-    ideal.sort()
-    #basic_dist.sort(reverse = True, key= lambda x: x[1])
-    #assert {basic_dist[0][0],basic_dist[1][0]}=={bitstring_to_int("1"*13), bitstring_to_int("0"*13)}
-    return relative_entropy_optimization.total_variation_distance(basic_dist, ideal)
+    basic_dist = [ (frozenset(f[0]), f[1]/ total)  for f in fmeas]
+    #basic_dist.sort()
+    #ideal = ideal_distribution()
+    #ideal.sort()
+    basic_dist.sort(reverse = True, key= lambda x: x[1])
+    #print(list(basic_dist[0][0])[0],list(basic_dist[1][0])[0])
+    #print(bitstring_to_int("1"*13), bitstring_to_int("0"*13))
+    assert {list(basic_dist[0][0])[0],list(basic_dist[1][0])[0]}=={bitstring_to_int("1"*13), bitstring_to_int("0"*13)}
+    return basic_dist[0][1]+basic_dist[1][1]
+    #return relative_entropy_optimization.total_variation_distance(basic_dist, ideal)
 
 def build_table_jigsaw_row(full_meas_options,p_meas_options):
     totmeas=create_total_measurement_tuples(full_meas_option,p_meas_option)
     ans = relative_entropy_optimization.jigsaw_reconstruction(totmeas,N,alpha=1)
-    ans = ans.p_func
-    ans.sort()
+    # ans = ans.p_func
+    # ans.sort()
     ideal = ideal_distribution()
     ideal.sort()
-    return relative_entropy_optimization.total_variation_distance(ans, ideal)
-    # ans = [(i,a) for i,a in enumerate(ans.p_func)]
-    # ans.sort(reverse=True, key= lambda x: x[1])
-    # assert {ans[0][0],ans[1][0]}=={bitstring_to_int("1"*13), bitstring_to_int("0"*13)}
-    # return 0.5*ans[0][1]+0.5*ans[1][1]
+    #return relative_entropy_optimization.total_variation_distance(ans, ideal)
+    ans = [(i,a) for i,a in enumerate(ans.p_func)]
+    ans.sort(reverse=True, key= lambda x: x[1])
+    assert {ans[0][0],ans[1][0]}=={bitstring_to_int("1"*13), bitstring_to_int("0"*13)}
+    return ans[0][1]+ans[1][1]
 
 def build_table_jigsaw_mod_row(full_meas_options,p_meas_options):
     totmeas=create_total_measurement_tuples(full_meas_option,p_meas_option)
     ans = relative_entropy_optimization.jigsaw_reconstruction(totmeas,N)
-    ans = ans.p_func
-    ans.sort()
-    ideal = ideal_distribution()
-    ideal.sort()
-    return relative_entropy_optimization.total_variation_distance(ans, ideal)
-    #
-    # ans = [(i,a) for i,a in enumerate(ans.p_func)]
-    # ans.sort(reverse=True, key= lambda x: x[1])
-    # print(ans[0][0],ans[1][0],bitstring_to_int("1"*13), bitstring_to_int("0"*13))
-    # assert {ans[0][0],ans[1][0]}=={bitstring_to_int("1"*13), bitstring_to_int("0"*13)}
-    # return 0.5*ans[0][1]+0.5*ans[1][1]
+    # ans = ans.p_func
+    # ans.sort()
+    # ideal = ideal_distribution()
+    # ideal.sort()
+    #return relative_entropy_optimization.total_variation_distance(ans, ideal)
+
+    ans = [(i,a) for i,a in enumerate(ans.p_func)]
+    ans.sort(reverse=True, key= lambda x: x[1])
+    #print(ans[0][0],ans[1][0],bitstring_to_int("1"*13), bitstring_to_int("0"*13))
+    assert {ans[0][0],ans[1][0]}=={bitstring_to_int("1"*13), bitstring_to_int("0"*13)}
+    return ans[0][1]+ans[1][1]
 
 full_meas_options,p_meas_options = ["0", "1"], ["untrimmed", "trimmed"]
 
-#methods = [build_table_basic_row, build_table_max_likelihood_row,build_table_jigsaw_mod_row, build_table_jigsaw_row]
-methods = [build_table_jigsaw_mod_row, build_table_jigsaw_row]
+methods = [ build_table_max_likelihood_row,build_table_jigsaw_mod_row, build_table_jigsaw_row]
+#methods = [build_table_jigsaw_mod_row, build_table_jigsaw_row]
 for method in methods:
     for full_meas_option, p_meas_option in itertools.product(full_meas_options,p_meas_options):
-        print(full_meas_option, p_meas_option, str(method), method(full_meas_option,p_meas_option))
+        print(full_meas_option, p_meas_option, str(method.__name__), method(full_meas_option,p_meas_option))
 # jigsaw_ans = relative_entropy_optimization.jigsaw_reconstruction(totmeas,N,alpha=1)
 # jigsaw_ans.sort(reverse=True)
 # print('jigsaw', jigsaw_ans[0:3])
