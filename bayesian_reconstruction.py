@@ -25,13 +25,11 @@ class ProbabilityDistribution:
         if not isinstance(N, int) or N <= 0:
             raise ValueError("N must be a positive integer.")
         self.N = N #Number of possible outcomes
-        self.p_func = p_func or self.default_p_func #A function that gives the probability of each outcome.
+        self.p_func = p_func or self.default_p_func() #A function that gives the probability of each outcome.
 
 
-    def default_p_func(self, k):
-        if not isinstance(k, int) or k < 0 or k > self.N:
-            raise ValueError(f"Invalid input k. It must be an integer between 0 and {self.N}.")
-        return 1 / self.N
+    def default_p_func(self):
+        return [1 / self.N]*self.N
 
     def sum_p_func_over_event(self, event): #Returns the probability of the event for this probability distribution.
         if not isinstance(event, Event):
@@ -39,11 +37,16 @@ class ProbabilityDistribution:
         if not event.N==self.N:
             raise ValueError("Event must have the same number of outcomes as distribution.")
         return sum(self.p_func(outcome) for outcome in event.outcomes)
-    def sample(self, size=1):
+    def sample(self, size=1, noise=0):
         if not isinstance(size, int) or size <= 0:
             raise ValueError("Size must be a positive integer.")
         # Generate random samples based on probabilities defined by p_func
-        samples = np.random.choice(range(self.N), size=size, p=self.p_func)
+        if noise == 0:
+            samples = np.random.choice(range(self.N), size=size, p=self.p_func)
+        else:
+            maximally_mixed = ProbabilityDistribution(self.N)
+            noisy_dist = self.average_with(maximally_mixed,1-noise)
+            samples = np.random.choice(range(self.N), size=size, p=noisy_dist.p_func)
         return samples
     def marginal(self,outcomes):
         #expects outcomes to be a list of elements [0,1...N-1]
@@ -57,6 +60,18 @@ class ProbabilityDistribution:
         marginal_dist = [m/denom for m in marginal_dist]
 
         return ProbabilityDistribution(new_N, p_func = marginal_dist)
+
+    def average_with(self, other_prob_dist,t):
+        #returns the probability distribution t*self + (1-t)*other
+        assert self.N==other_prob_dist.N
+        if t ==1:
+            return self
+        elif t==0:
+            return other_prob_dist
+        new_pfunc = [t*x+(1-t)*y for x,y in zip(self.p_func, other_prob_dist.p_func) ]
+        tot=sum(new_pfunc)
+        new_pfunc = [p/tot for p in new_pfunc]
+        return ProbabilityDistribution(self.N, new_pfunc)
 
 class Event: #Describes a partial measurement of outcomes.
     def __init__(self, outcomes, N, confidence=1.0):
