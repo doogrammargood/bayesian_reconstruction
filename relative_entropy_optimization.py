@@ -57,7 +57,7 @@ def optimal_distribution(samples_list):
         if z is None: return f, Df
         H = spdiag(z[0] * mul(y, x**-2))
         return f, Df, H
-    solvers.options['show_progress']=False
+    #solvers.options['show_progress']=False
     #solvers.options['verbose']=True
     solvers.options['maxiters'] = 5000
     return solvers.cp(F, A=A, b=b)['x']
