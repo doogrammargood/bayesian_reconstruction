@@ -3,7 +3,13 @@ import numpy as np
 from itertools import chain, combinations, product, groupby
 import bayesian_reconstruction
 import matplotlib.pyplot as plt
+import math
 
+from sklearn.datasets import make_sparse_coded_signal
+from sklearn.linear_model import OrthogonalMatchingPursuit, OrthogonalMatchingPursuitCV
+
+import warnings
+warnings.filterwarnings('error')
 
 def observation_matrix(samples_list): #makes sure that none of the samples occurs exactly 0 times.
     eps=0.000001
@@ -57,7 +63,7 @@ def optimal_distribution(samples_list):
         if z is None: return f, Df
         H = spdiag(z[0] * mul(y, x**-2))
         return f, Df, H
-    #solvers.options['show_progress']=False
+    solvers.options['show_progress']=False
     #solvers.options['verbose']=True
     solvers.options['maxiters'] = 5000
     return solvers.cp(F, A=A, b=b)['x']
@@ -178,9 +184,9 @@ def complete_example():
 def jigsaw_new_samples(current_distribution,pmeas,N,alpha):
     new_distribution = []
     for p in pmeas:
-        marginal = current_distribution.marginal(p[0])
         l = list(p[0])
         l.sort()
+        marginal = current_distribution.marginal(l)
         tot = sum([current_distribution.p_func[o] for o in l])
         for index, x in enumerate(l):
             if alpha == 0:
@@ -200,11 +206,13 @@ def jigsaw_new_samples(current_distribution,pmeas,N,alpha):
 def jigsaw_reconstruction(samples_list,N,t=0, alpha =0, num_iterations=10 ):
     #implements the technique from the jigsaw paper to reconstruct the distribution from samples_list.
     fmeas = [(s[0], s[1]) for s in samples_list if len(s[0])==1]
+    #print(fmeas)
     pmeas = [(s[0], s[1]) for s in samples_list if len(s[0])>1]
     denom = sum([s[1] for s in fmeas])
     current_distribution = bayesian_reconstruction.ProbabilityDistribution(N, p_func=[ s[1]/denom for s in fmeas])
     count = 0
     while count <num_iterations:
+        #print(current_distribution.p_func)
         new_distribution = jigsaw_new_samples(current_distribution,pmeas,N ,alpha)
         if hellinger_distance(current_distribution.p_func, new_distribution.p_func) < .0001:
             print("jigsaw completed")
@@ -257,14 +265,14 @@ def p_meas_qubits(qubits_list,n):
     return [partition_from_qubits(meas,n) for meas in qubits_list]
 #partition_from_qubits([2],3)
 
-def sampler(n,qubit_list,dist = None,pmeas_sample_size = 1000):
+def sampler(n,qubit_list,dist = None,fmeas_sample_size=1000,pmeas_sample_size = 1000,full_noise = 0, partial_noise=0):
     #n is the number of qubits.
     #qubits list is a list of tuples. Each tuple is a set of qubits to measure.
     N= 2**n
     if dist == None:
         dist = bayesian_reconstruction.ProbabilityDistribution(N, bayesian_reconstruction.uniform_sample_simplex(N))
-    fmeas = simulate_partial_measurements(dist, generate_partial_measurements(range(N), 1), N, sample_size = 1000, noise =0)
-    pmeas = simulate_partial_measurements(dist, p_meas_qubits(qubit_list,n),N, sample_size = pmeas_sample_size, noise =0)
+    fmeas = simulate_partial_measurements(dist, generate_partial_measurements(range(N), 1), N, sample_size = fmeas_sample_size, noise =full_noise)
+    pmeas = simulate_partial_measurements(dist, p_meas_qubits(qubit_list,n),N, sample_size = pmeas_sample_size, noise =partial_noise)
     totmeas = pmeas + fmeas
     def sort_function(s):
         return set_of_outcomes_to_integer(s[0],N)
@@ -287,11 +295,12 @@ def qubit_partial_measurement_example(n):
     print("jigsaw modified", total_variation_distance(dist.p_func, jigsaw_modified_ans.p_func))
     print("corrected", total_variation_distance(dist.p_func, corrected_answer))
 
-def generate_noiseless_plot(n):
+def generate_noiseless_plot(n,full_noise=0,partial_noise=0):
     N= 2**n
     num_trials = 1000
     #pmeas_sample_sizes = [100,500,1000,5000,10000,50000,100000]
     pmeas_sample_sizes = [2**k for k in [3,4,5,6,7,8,9,10,11,12]]
+    #pmeas_sample_sizes = [2**k for k in [6,7]]
     #pmeas_sample_sizes = [100,500]
 
     basic_answers=[]
@@ -341,17 +350,50 @@ def generate_noiseless_plot(n):
     plt.yscale('log')
     plt.xlabel('Log of partial measurement samples')
     plt.ylabel('Log of total variation distance to true distribution')
-    plt.title("Comparison of reconstruction methods for " + str(n) + " qubits")
+    plt.title("Reconstruction of " + str(n) + " qubits \n with " + str(full_noise) + " noise for full measurements and " + str(partial_noise) + " noise for partial measurements")
     plt.legend()
-    plt.savefig('{}_qubits_plot.png'.format(n))
+    #plt.figtext(0,0,'Sampling 1000 points from the full distribution with {} depolarizing noise. The number of samples from each partial distribuition is on the x axis, each with noise {}'.format(full_noise, partial_noise))
+    plt.savefig('{}_qubits_plot_noises{}_{}.png'.format(n,full_noise,partial_noise))
     plt.show()
 
 def check_scalability():
     for n in range(5,14):
         qubit_partial_measurement_example(n)
 
+def generate_noisy_plots():
+    qubits = [5,6,7,8,9]
+    full_noises = [0, 0.1, 0.2, 0.5,0.8,1.0]
+    partial_noises = [0, 0.1, 0.2,0.5,0.8,1.0]
+    for f in full_noises:
+        for p in partial_noises:
+            for n in qubits:
+                generate_noiseless_plot(n,full_noise=f,partial_noise=p)
+#generate_noisy_plots()
+
 #check_scalability()
 #generate_noiseless_plot(7)
 
 #qubit_partial_measurement_example(5)
 #print(set_of_outcomes_to_integer({0},10), set_of_outcomes_to_integer({0,1},10))
+
+def compressed_sensing_dist(samples_list,N):
+    #Applies orthogonal matching pursuit algorithm
+    #to the partial
+    prev_score = -math.inf
+    rhs = [s[1] for s in samples_list]
+    # rhs = [s[1] if s[1]>tol and s[1]>0 else 0.0 for s in samples_list]
+    rhs = [r/sum(rhs) for r in rhs]
+    #print(rhs)
+    A = [ [ 1 if c in s[0]  else 0 for c in range(N)] for s in samples_list] #measurement matrix
+    # print(A)
+    # print(len(A))
+    # print(len(A[0]))
+    # print(rhs)
+    omp = OrthogonalMatchingPursuit(tol =0.001)
+    omp.fit(A,rhs)
+    coef = omp.coef_
+    score = omp.score(A,rhs)
+    print(score)
+    coef = [c  if c>0 else 0 for c in coef]
+    coef = coef/sum(coef)
+    return coef

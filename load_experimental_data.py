@@ -46,7 +46,8 @@ def pad_bitstring(bitstring):#adds 0's in front of the bitstrings.
     return '0'*(13-len(bitstring)) + bitstring
 
 def bitstring_to_int(bitstring, n=13):#Interprets the bitstring as binary and returns the associated integer
-    return BitArray(bin=bitstring).int + 2**(n-1)
+    #return BitArray(bin=bitstring).int + 2**(n-1)
+    return int(bitstring, 2)
 
 def bitstrings():
     return [''.join(i) for i in itertools.product('01', repeat=13)]
@@ -155,7 +156,7 @@ def build_table_basic_row(full_meas_option,p_meas_option):
     #return relative_entropy_optimization.total_variation_distance(basic_dist, ideal)
     return relative_entropy_optimization.hellinger_distance(basic_dist,ideal)
 
-def build_table_jigsaw_row(full_meas_options,p_meas_options):
+def build_table_jigsaw_row(full_meas_option,p_meas_option):
     totmeas=create_total_measurement_tuples(full_meas_option,p_meas_option)
     ans = relative_entropy_optimization.jigsaw_reconstruction(totmeas,N,alpha=1)
     ideal = ideal_distribution()
@@ -163,30 +164,45 @@ def build_table_jigsaw_row(full_meas_options,p_meas_options):
     #return relative_entropy_optimization.total_variation_distance(ans.p_func, ideal)
     return relative_entropy_optimization.hellinger_distance(ans.p_func,ideal)
 
-def build_table_jigsaw_mod_row(full_meas_options,p_meas_options):
+def build_table_jigsaw_mod_row(full_meas_option,p_meas_option):
     totmeas=create_total_measurement_tuples(full_meas_option,p_meas_option)
     ans = relative_entropy_optimization.jigsaw_reconstruction(totmeas,N)
     #return success_probability(ans.p_func)
     ideal = ideal_distribution()
     #return relative_entropy_optimization.total_variation_distance(ans.p_func, ideal)
     return relative_entropy_optimization.hellinger_distance(ans.p_func,ideal)
-full_meas_options,p_meas_options = ["0", "1"], ["untrimmed", "trimmed","ideal"]
 
-methods = [build_table_basic_row, build_table_max_likelihood_row,build_table_jigsaw_mod_row, build_table_jigsaw_row]
-#methods = [build_table_jigsaw_mod_row, build_table_jigsaw_row]
-for method in methods:
-    for full_meas_option, p_meas_option in itertools.product(full_meas_options,p_meas_options):
-        print(full_meas_option, p_meas_option, str(method.__name__), method(full_meas_option,p_meas_option))
-# jigsaw_ans = relative_entropy_optimization.jigsaw_reconstruction(totmeas,N,alpha=1)
-# jigsaw_ans.sort(reverse=True)
-# print('jigsaw', jigsaw_ans[0:3])
-# jigsaw_modified_ans = relative_entropy_optimization.jigsaw_reconstruction(totmeas,N)
-# jigsaw_modified_ans.sort(reverse=True)
-# print('jigsaw_mod', jigsaw_modified_ans[0:3])
-print(bitstring_to_int('1'*13))
-print(bitstring_to_int('0'*13))
+def build_table_compressed_sensing_row(full_meas_option,p_meas_option):
+    pmeas=create_partial_measurement_tuples(p_meas_option)
+    ans = relative_entropy_optimization.compressed_sensing_dist(pmeas,N)
+    ideal = ideal_distribution()
+    return relative_entropy_optimization.hellinger_distance(ans,ideal)
+
+def build_table_of_methods():
+
+    full_meas_options,p_meas_options = ["0", "1"], ["untrimmed", "trimmed","ideal"]
+
+    #methods = [build_table_basic_row, build_table_max_likelihood_row,build_table_jigsaw_mod_row, build_table_jigsaw_row]
+    methods = [build_table_jigsaw_mod_row, build_table_jigsaw_row, build_table_compressed_sensing_row]
+    for method in methods:
+        for full_meas_option, p_meas_option in itertools.product(full_meas_options,p_meas_options):
+            print(full_meas_option, p_meas_option, str(method.__name__), method(full_meas_option,p_meas_option))
+build_table_of_methods()
+
+    # jigsaw_ans = relative_entropy_optimization.jigsaw_reconstruction(totmeas,N,alpha=1)
+    # jigsaw_ans.sort(reverse=True)
+    # print('jigsaw', jigsaw_ans[0:3])
+    # jigsaw_modified_ans = relative_entropy_optimization.jigsaw_reconstruction(totmeas,N)
+    # jigsaw_modified_ans.sort(reverse=True)
+    # print('jigsaw_mod', jigsaw_mo
+
+#print(build_table_compressed_sensing_row("0", "untrimmed"))
 
 
+def check_bitstring_to_int():
+    for b in bitstrings():
+        print(bitstring_to_int(b)) #should count 0,1,2,... 2^N-1
+#check_bitstring_to_int()
 
 
 # Method |Weigh partial_meas? | Full Meas | Partial Meas | Converged? | TVD |
